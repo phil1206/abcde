@@ -1,0 +1,12 @@
+{
+  "name": "台股零股儀表板",
+  "short_name": "台股儀表板",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#171d35",
+  "theme_color": "#171d35",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
