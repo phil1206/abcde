@@ -429,6 +429,21 @@ try {
     $json = $out | ConvertTo-Json -Depth 8 -Compress
     "window.DASH_DATA = $json;" | Set-Content -Path (Join-Path $dataDir 'data.js') -Encoding UTF8
     Log "更新完成：觀察 $($watchOut.Count) 檔／法人榜 $(@($screenInst).Count)／殖利率榜 $(@($screenYield).Count)／營收榜 $(@($screenRev).Count)"
+
+    # ---------- 7. 自動上傳到 GitHub Pages（手機版網站） ----------
+    if (Test-Path (Join-Path $root '.git')) {
+        try {
+            git -C $root add -A 2>&1 | Out-Null
+            $st = git -C $root status --porcelain
+            if ($st) {
+                git -C $root commit -m "每日資料更新 $(Get-Date -Format 'yyyy-MM-dd HH:mm')" 2>&1 | Out-Null
+                git -C $root push 2>&1 | Out-Null
+                Log '已上傳到 GitHub Pages'
+            } else {
+                Log '資料無變化，免上傳'
+            }
+        } catch { Log "GitHub 上傳失敗（本機網站不受影響）：$($_.Exception.Message)" }
+    }
 } catch {
     Log "更新失敗：$($_.Exception.Message)"
     exit 1
