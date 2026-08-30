@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的台股零股儀表板</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --text:#1a1d24; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#2563eb; --up:#d92b2b; --down:#0f9d58; --flat:#6b7280;
+    --badge-bull:#fdecec; --badge-bull-t:#c02222; --badge-bear:#e6f4ec; --badge-bear-t:#0b7a44;
+    --badge-neutral:#eef0f3; --badge-neutral-t:#555c66; --warn-bg:#fff8e6; --warn-line:#f0d48a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12141a; --card:#1c1f27; --text:#e8eaf0; --muted:#9aa1ad; --line:#2c313c;
+      --accent:#5b8def; --up:#ff6b6b; --down:#3ecf8e;
+      --badge-bull:#3a2224; --badge-bull-t:#ff9a9a; --badge-bear:#1c332a; --badge-bear-t:#7fe0b2;
+      --badge-neutral:#262a33; --badge-neutral-t:#aab2bf; --warn-bg:#2d2a1c; --warn-line:#6b5e2e;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--text);
+       font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif; line-height:1.6}
+  .wrap{max-width:1080px; margin:0 auto; padding:16px}
+  header.top{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; margin:8px 0 4px}
+  header.top h1{font-size:1.5rem; margin:0}
+  .updated{color:var(--muted); font-size:.85rem}
+  .disclaimer{background:var(--warn-bg); border:1px solid var(--warn-line); border-radius:10px;
+              padding:10px 14px; font-size:.86rem; margin:10px 0}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin:14px 0}
+  .card h2{font-size:1.1rem; margin:0 0 10px}
+  .sub{color:var(--muted); font-size:.82rem}
+  .taiex-row{display:flex; flex-wrap:wrap; gap:20px; align-items:center}
+  .taiex-num{font-size:1.9rem; font-weight:700}
+  .budget input{width:120px; padding:6px 10px; border:1px solid var(--line); border-radius:8px;
+                background:var(--bg); color:var(--text); font-size:1rem}
+  .tablebox{overflow-x:auto}
+  table{border-collapse:collapse; width:100%; font-size:.88rem; white-space:nowrap}
+  th,td{padding:7px 9px; border-bottom:1px solid var(--line); text-align:right}
+  th{color:var(--muted); font-weight:600; font-size:.8rem; position:sticky; top:0; background:var(--card)}
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2){text-align:left}
+  tr.clickable{cursor:pointer}
+  tr.clickable:hover td{background:rgba(120,140,180,.08)}
+  tr.detail td{text-align:left; background:rgba(120,140,180,.06); font-size:.85rem; white-space:normal}
+  .up{color:var(--up); font-weight:600}
+  .down{color:var(--down); font-weight:600}
+  .flat{color:var(--flat)}
+  .badge{display:inline-block; padding:2px 9px; border-radius:99px; font-size:.78rem; font-weight:600}
+  .b-bull{background:var(--badge-bull); color:var(--badge-bull-t)}
+  .b-bear{background:var(--badge-bear); color:var(--badge-bear-t)}
+  .b-neutral{background:var(--badge-neutral); color:var(--badge-neutral-t)}
+  .tabs{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px}
+  .tabs button{border:1px solid var(--line); background:var(--bg); color:var(--text);
+               padding:6px 14px; border-radius:99px; cursor:pointer; font-size:.86rem}
+  .tabs button.active{background:var(--accent); border-color:var(--accent); color:#fff}
+  details{border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin:8px 0; background:var(--bg)}
+  summary{cursor:pointer; font-weight:600}
+  details p, details ul{font-size:.88rem; margin:8px 0}
+  .analysis-item{border-left:3px solid var(--accent); padding:2px 0 2px 14px; margin:14px 0}
+  .analysis-item h3{margin:0 0 4px; font-size:1rem}
+  .analysis-item .date{color:var(--muted); font-size:.8rem}
+  .analysis-item .content{font-size:.9rem}
+  .usrow{margin-top:12px; padding-top:10px; border-top:1px solid var(--line);
+         display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; font-size:.88rem}
+  .weather{border-radius:10px; padding:9px 13px; font-size:.87rem; margin:0 0 12px}
+  .w-red{background:var(--badge-bull); color:var(--badge-bull-t)}
+  .w-yellow,.w-hot{background:var(--warn-bg); border:1px solid var(--warn-line)}
+  .w-green{background:var(--badge-bear); color:var(--badge-bear-t)}
+  footer{color:var(--muted); font-size:.78rem; margin:20px 0; line-height:1.7}
+  .afford{color:var(--accent); font-weight:600}
+  .spark{vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>📈 我的台股零股儀表板</h1>
+    <span class="updated" id="updated"></span>
+  </header>
+
+  <div class="disclaimer">
+    ⚠️ 本頁為<strong>個人學習用資料整理工具</strong>，所有訊號與參考價位皆由公開數據（均線、法人買賣超、營收、本益比）機械式計算而成，
+    <strong>不構成投資建議、不保證獲利</strong>。股價漲跌無人能準確預測，投資前請自行判斷，僅使用閒錢、分批布局。
+  </div>
+
+  <div class="card">
+    <div class="taiex-row">
+      <div>
+        <div class="sub">加權指數（大盤）</div>
+        <div><span class="taiex-num" id="taiexNum"></span> <span id="taiexChg"></span></div>
+      </div>
+      <div><svg id="taiexSpark" class="spark" width="260" height="56"></svg><div class="sub" style="text-align:center">近 60 個交易日走勢</div></div>
+      <div class="budget">
+        <div class="sub">我的投資預算（元）</div>
+        <input type="number" id="budget" min="1000" step="1000">
+        <div class="sub">表格中的「可買股數」依此計算</div>
+      </div>
+    </div>
+    <div id="usRow" class="usrow" hidden>
+      <span class="sub">🌙 最近美股收盤：</span><span id="usItems"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>⭐ 今日自動精選 <span class="sub">（每天收盤後自動重新篩選，附推薦理由）</span></h2>
+    <div id="weatherAdvice" hidden></div>
+    <div class="tablebox">
+      <table id="picksTable">
+        <thead><tr><th>代號</th><th>名稱</th><th>收盤價</th><th>推薦理由（機械式篩選）</th><th>連續上榜</th><th>可買股數</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="sub">入選條件：當日成交量 500 張以上，且至少符合以下 3 項——法人買超 ≥1 億、殖利率 ≥3.5%、本益比 ≤20 倍、月營收年增 ≥20%。符合越多項排越前面。
+    這是<strong>數據篩選的研究名單，不是買進指令</strong>：入選代表「籌碼與基本面同時亮燈、值得花時間研究」，買前請自行確認產業與新聞面。
+    <strong>「連續上榜」天數越多，越不是一日行情</strong>——連 3 天以上（🔥）代表法人是持續買進，參考價值較高；首日上榜的先觀察、別急著追。</p>
+  </div>
+
+  <div class="card">
+    <h2>👀 觀察清單 <span class="sub">（點任一列可展開參考建議與走勢）</span></h2>
+    <div class="tablebox">
+      <table id="watchTable">
+        <thead><tr>
+          <th>代號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>訊號</th>
+          <th>20日線</th><th>60日線</th><th>本益比</th><th>殖利率%</th>
+          <th>法人買賣超(億)</th><th>營收年增%</th><th>可買股數</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="sub">訊號規則：股價 &gt; 20日線 且 20日線 &gt; 60日線 → 偏多；股價 &lt; 60日線 且 20日線 &lt; 60日線 → 偏空；其餘 → 中性。想改觀察清單，請告訴 Claude 或編輯 update.ps1 裡的 $WATCH。</p>
+  </div>
+
+  <div class="card">
+    <h2>🔍 今日市場焦點</h2>
+    <div class="tabs">
+      <button data-tab="inst" class="active">法人買超金額排行</button>
+      <button data-tab="yield">高殖利率零股精選</button>
+      <button data-tab="rev">營收高成長</button>
+    </div>
+    <div class="sub" id="screenNote" style="margin-bottom:8px"></div>
+    <div class="tablebox"><table id="screenTable"><thead></thead><tbody></tbody></table></div>
+    <p class="sub">篩選榜單只代表「數據上值得研究」，不代表可以直接買進。出現在榜上的小型股波動可能很大，新手請先從觀察清單的大型股與 ETF 練習。</p>
+  </div>
+
+  <div class="card">
+    <h2>🤖 AI 趨勢分析 <span class="sub">（想更新時，開啟 Claude Code 說「幫我更新本週分析」即可）</span></h2>
+    <div id="analysisBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>🎓 新手教室</h2>
+    <details>
+      <summary>零股是什麼？怎麼買？</summary>
+      <p>台股一般以「張」為單位（1 張 = 1000 股），但零股讓你 1 股就能買。例如台積電 1 張要兩百多萬，零股 1 股只要兩千多元。</p>
+      <ul>
+        <li><strong>盤中零股</strong>：交易日 9:00 起可委託，開盤後分時撮合（頻率比整股低），只能用限價單。</li>
+        <li><strong>盤後零股</strong>：13:40～14:30 委託，14:30 一次撮合。</li>
+        <li>下單時在券商 App 選「零股」即可，操作方式和一般買股一樣。</li>
+      </ul>
+    </details>
+    <details>
+      <summary>零股的手續費陷阱（小資族必看）</summary>
+      <p>手續費公定為成交金額的 0.1425%，但多數券商有「最低手續費」（常見 1～20 元）。買 500 元的零股若被收 20 元低消，等於先虧 4%！</p>
+      <ul>
+        <li>選擇零股手續費<strong>低消 1 元</strong>的券商，或有定期定額優惠的券商。</li>
+        <li>單筆金額太小就不划算，建議每筆至少幾千元，或累積後一次買。</li>
+        <li>賣出時另收證交稅 0.3%（ETF 為 0.1%）。</li>
+      </ul>
+    </details>
+    <details>
+      <summary>⭐ 看懂「今日自動精選」：四個燈號的白話解釋</summary>
+      <p>精選名單是機器每天檢查全市場 1,300 多檔股票，看以下四個「燈號」，同時亮 3 個以上才入選：</p>
+      <ul>
+        <li><strong>三大法人買超：</strong>「三大法人」指外資（國外大型基金）、投信（國內基金公司）、自營商（券商自己操盤的錢）。他們資金龐大、有專業研究團隊，一天買超上億元，代表大戶正在收集這檔股票。散戶跟著籌碼方向走，通常比自己亂猜安全。<span class="up">正數紅色＝買超</span>、<span class="down">負數綠色＝賣超</span>。</li>
+        <li><strong>殖利率：</strong>把股票當定存看的「利率」。殖利率 4% 意思是：股價 100 元、每年配息 4 元，比銀行定存高很多。但注意——這是用「過去」的配息算的，公司變差的話明年不一定配得出來。</li>
+        <li><strong>本益比：</strong>白話是「照現在的賺錢速度，幾年回本」。本益比 15 倍＝公司要賺 15 年才等於現在的股價。台股平均約 15～20 倍；<strong>低於 15 算便宜</strong>，但成長很快的公司（如 AI 股）市場願意給 30 倍以上也正常。</li>
+        <li><strong>營收年增率：</strong>公司這個月的收入比「去年同一個月」多了幾 %。這是最即時的成績單（每月 10 日前公布）。<strong>年增 20% 以上＝生意明顯變好</strong>，常是股價上漲的先行指標。</li>
+        <li><strong>連續上榜：</strong>上面的燈號「連續好幾天」同時亮著。🔥（連 3 天以上）代表法人持續買、不是一日煙火，參考價值最高；「首日上榜」的先觀察就好。</li>
+        <li><strong>市場天氣燈號（精選名單上方的色塊）：</strong>根據最近一晚美股（那斯達克、費城半導體、台積電 ADR）的漲跌自動判斷。分工是——<strong>精選名單告訴你「該研究哪檔」，天氣燈號告訴你「今天適不適合出手」</strong>。🔴 重挫＝暫緩下單；🟡 偏弱＝保守減量；🟠 大漲＝開高別追；🟢 平穩＝照計畫執行。網站每天早上 8:30 也會自動更新一次，早上掛單前看到的就是最新的美股收盤。</li>
+        <li><strong>股價淨值比（榜單裡會出現）：</strong>股價除以「公司帳面上每股值多少錢」。小於 1＝用不到帳面價值的價格買到，理論上便宜；但長期小於 1 也可能代表市場認為這家公司賺不了錢。</li>
+      </ul>
+    </details>
+    <details>
+      <summary>👀 看懂「觀察清單」每一欄</summary>
+      <ul>
+        <li><strong>收盤價：</strong>今天最後的成交價，也就是你買 1 股零股要花的錢。</li>
+        <li><strong>漲跌%：</strong>跟昨天比漲跌多少。台股慣例<span class="up">紅色＝漲</span>、<span class="down">綠色＝跌</span>（跟美股相反）。單日超過 ±3% 就算大波動。</li>
+        <li><strong>訊號：</strong>綜合判斷的結論（偏多／中性／偏空），規則見下一則教學。<strong>只在「偏多」時考慮買進</strong>，是最簡單的用法。</li>
+        <li><strong>20日線（月線）：</strong>最近一個月所有買進的人的「平均成本」。股價在月線之上＝最近買的人都賺錢、賣壓小；跌破月線＝短線轉弱的第一個警訊。</li>
+        <li><strong>60日線（季線）：</strong>近一季的平均成本，法人最重視的多空分界線，又叫「生命線」。跌破季線通常代表趨勢真的壞了。</li>
+        <li><strong>本益比／殖利率：</strong>意思同上一則。ETF（0050 這類）沒有這兩個數字，顯示「—」是正常的。</li>
+        <li><strong>法人買賣超(億)：</strong>三大法人今天合計買（紅）或賣（綠）了多少億元的這檔股票。</li>
+        <li><strong>營收年增%：</strong>意思同上一則。ETF 沒有營收，顯示「—」正常。</li>
+        <li><strong>可買股數：</strong>用你上方設定的預算，全部拿去買這檔可以買幾股。</li>
+        <li><strong>💡 點任何一列</strong>可以展開：白話參考建議（附具體價位）、外資/投信連買天數、近 60 日走勢圖。</li>
+      </ul>
+    </details>
+    <details>
+      <summary>這個網站的訊號怎麼看？進出場參考原則</summary>
+      <p>本站用最常見的兩條均線判斷趨勢：<strong>20日線（月線）</strong>代表近一個月平均成本，<strong>60日線（季線）</strong>代表近一季平均成本。</p>
+      <ul>
+        <li><span class="badge b-bull">偏多</span> 股價站在月線上、月線又高於季線：趨勢向上，適合<strong>分批</strong>買進；跌破月線先減碼。</li>
+        <li><span class="badge b-neutral">中性</span> 均線糾結：多空不明，觀望為主，等站穩月線再說。</li>
+        <li><span class="badge b-bear">偏空</span> 股價在季線下、月線也低於季線：趨勢向下，不要接刀；等站回季線再考慮。</li>
+        <li>搭配<strong>法人買賣超</strong>：外資、投信連續買超通常是加分；連續賣超要小心。</li>
+        <li>記住：均線是「參考」不是「保證」，永遠分批進出、設好停損（例如 -10%），不要一次全壓。</li>
+      </ul>
+    </details>
+    <details>
+      <summary>📋 完整決策流程：從打開網站到下單的五個步驟</summary>
+      <ol style="font-size:.88rem">
+        <li><strong>每天傍晚掃一眼「今日自動精選」</strong>——只記下 🔥 連 3 天以上的，首日上榜的直接跳過。</li>
+        <li><strong>搞懂這家公司在做什麼</strong>——Google「代號＋公司名」，如果看完還是不懂它怎麼賺錢，就放棄這檔（買不懂的東西＝賭博）。</li>
+        <li><strong>加入觀察清單追蹤</strong>——跟 Claude 說「幫我把 XXXX 加入觀察清單」，然後等它的訊號變「偏多」。訊號偏空或中性時，再心癢也先等。</li>
+        <li><strong>買進：小額分批</strong>——第一筆只用預算的 1/6～1/10 買零股試單。買完如果回檔但沒破月線，可以再加碼一份；一次全押是新手最常見的死法。</li>
+        <li><strong>賣出：三個情況擇一就行動</strong>——
+          ① 跌破 20 日線 → 先賣一半；
+          ② 跌破 60 日線 → 全部出場觀望；
+          ③ 達到自己設的目標（例如 +20%）→ 分批獲利了結。
+          另外<strong>虧損超過 10% 無條件停損</strong>，本金小，留得青山在比什麼都重要。</li>
+      </ol>
+    </details>
+    <details>
+      <summary>⚠️ 新手常見陷阱（很重要，務必看完）</summary>
+      <ul>
+        <li><strong>高殖利率陷阱：</strong>航運、鋼鐵、面板這類「景氣循環股」獲利大起大落——去年大賺所以配息多、殖利率看起來 8%、10% 超誘人，但今年可能大虧、明年配不出來。看到超高殖利率，先查它獲利穩不穩定（金融股、電信股通常穩；循環股要小心）。</li>
+        <li><strong>低本益比陷阱：</strong>同樣道理，循環股在獲利最高峰時本益比反而最低——看起來最便宜的時候，常常是最危險的時候。</li>
+        <li><strong>追高陷阱：</strong>法人買超是「今天已經發生」的事，一檔已經連漲很多天才上榜的股票，你隔天追進去可能買在短線最高點。寧可等回檔到月線附近再接。</li>
+        <li><strong>零股流動性：</strong>冷門股的零股可能掛單很久都沒成交，或買賣價差很大。盡量挑成交量大的股票（本站榜單已先過濾）。</li>
+        <li><strong>「保證獲利」都是詐騙：</strong>LINE 群組老師帶單、飆股報明牌，100% 是詐騙。真正能看的只有你眼前這些公開數據。</li>
+      </ul>
+    </details>
+    <details>
+      <summary>小資族（幾萬元）的實戰建議</summary>
+      <ul>
+        <li><strong>核心持股用 ETF</strong>（如 0050／006208 或高股息 ETF）：一次買進一籃子股票，不怕單一公司暴雷。</li>
+        <li>資金可拆成 6～10 份，每月投入 1 份（定期定額概念），跌深時可加碼一份。</li>
+        <li>個股部位建議不超過總資金三分之一，且選大型權值股練手感。</li>
+        <li>賺了不要急著梭哈，虧了不要急著凹單——本金小，活得久比賺得快重要。</li>
+        <li>任何「保證獲利」「老師帶單」的群組都是詐騙，證交所資料才是你最好的朋友。</li>
+      </ul>
+    </details>
+  </div>
+
+  <footer>
+    資料來源：台灣證券交易所 OpenAPI（每日行情、本益比／殖利率、三大法人買賣超、上市公司月營收）。
+    資料為收盤後靜態數據，非即時報價；法人資料於交易日下午約 4 點後公布。
+    本頁僅供個人學習研究，非投資建議；依本頁資訊操作之盈虧請自行負責。
+  </footer>
+</div>
+
+<script src="data/data.js"></script>
+<script src="data/analysis.js"></script>
+<script>
+(function(){
+  var D = window.DASH_DATA;
+  if(!D){ document.getElementById('updated').textContent = '尚無資料，請先執行「更新資料.bat」'; return; }
+
+  function num(v,dec){ return (v===null||v===undefined||isNaN(v)) ? '—' : Number(v).toLocaleString('zh-TW',{minimumFractionDigits:dec===undefined?2:dec, maximumFractionDigits:dec===undefined?2:dec}); }
+  function cls(v){ return v>0 ? 'up' : (v<0 ? 'down' : 'flat'); }
+  function sign(v){ return v>0 ? '▲' : (v<0 ? '▼' : ''); }
+  function badge(s){
+    if(s==='偏多') return '<span class="badge b-bull">偏多</span>';
+    if(s==='偏空') return '<span class="badge b-bear">偏空</span>';
+    if(s==='中性') return '<span class="badge b-neutral">中性</span>';
+    return '<span class="badge b-neutral">'+s+'</span>';
+  }
+
+  document.getElementById('updated').textContent = '資料日期 '+D.dataDate+'｜更新於 '+D.updated;
+
+  // ---- 大盤 ----
+  document.getElementById('taiexNum').textContent = num(D.taiex.last);
+  var tc = D.taiex.chg||0;
+  var tEl = document.getElementById('taiexChg');
+  tEl.textContent = sign(tc)+' '+num(Math.abs(tc));
+  tEl.className = cls(tc);
+  drawSpark(document.getElementById('taiexSpark'), D.taiex.history.map(function(h){return h.c;}));
+
+  function drawSpark(svg, vals){
+    if(!vals || vals.length<2) return;
+    var w = +svg.getAttribute('width'), h = +svg.getAttribute('height'), pad=4;
+    var mn = Math.min.apply(null,vals), mx = Math.max.apply(null,vals);
+    if(mx===mn) mx=mn+1;
+    var pts = vals.map(function(v,i){
+      return [ pad+(w-2*pad)*i/(vals.length-1), h-pad-(h-2*pad)*(v-mn)/(mx-mn) ];
+    });
+    var upTrend = vals[vals.length-1] >= vals[0];
+    var color = upTrend ? getComputedStyle(document.documentElement).getPropertyValue('--up') : getComputedStyle(document.documentElement).getPropertyValue('--down');
+    var d = 'M'+pts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join('L');
+    svg.innerHTML = '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="1.8"/>';
+  }
+
+  // ---- 預算 ----
+  var budgetInput = document.getElementById('budget');
+  var budget = 30000;
+  try{ var s = localStorage.getItem('budget'); if(s) budget = +s; }catch(e){}
+  budgetInput.value = budget;
+  budgetInput.addEventListener('input', function(){
+    budget = +budgetInput.value || 0;
+    try{ localStorage.setItem('budget', budget); }catch(e){}
+    renderWatch(); renderScreen(curTab); renderPicks();
+  });
+
+  // ---- 昨夜美股與市場天氣 ----
+  if(D.us && D.us.items && D.us.items.length){
+    document.getElementById('usRow').hidden = false;
+    document.getElementById('usItems').innerHTML = D.us.items.map(function(u){
+      return u.name+'（'+u.date+'）<span class="'+cls(u.pct)+'">'+num(u.price)+'　'+sign(u.pct)+Math.abs(u.pct).toFixed(2)+'%</span>';
+    }).join('　｜　');
+    var wa = document.getElementById('weatherAdvice');
+    wa.hidden = false;
+    wa.className = 'weather w-'+D.us.mood;
+    wa.innerHTML = '<strong>'+D.us.moodText+'</strong>　'+D.us.advice;
+  }
+
+  // ---- 今日自動精選 ----
+  function renderPicks(){
+    var tb = document.querySelector('#picksTable tbody');
+    var ps = D.picks || [];
+    if(!ps.length){
+      tb.innerHTML = '<tr><td colspan="6" class="sub" style="text-align:left">今日無符合條件的標的（假日或法人資料尚未公布時也會顯示此訊息）</td></tr>';
+      return;
+    }
+    tb.innerHTML = ps.map(function(r){
+      var st;
+      if(r.streak>=3) st = '<span class="badge b-bull">連 '+r.streak+' 天 🔥</span>';
+      else if(r.streak>=2) st = '<span class="badge b-neutral">連 '+r.streak+' 天</span>';
+      else st = '<span class="sub">首日上榜</span>';
+      return '<tr><td>'+r.code+'</td><td>'+r.name+'</td><td>'+num(r.price)+'</td>'+
+        '<td style="text-align:left;white-space:normal">'+r.reasons+'</td>'+
+        '<td>'+st+'</td>'+
+        '<td>'+affordCell(r.price)+'</td></tr>';
+    }).join('');
+  }
+
+  // ---- 觀察清單 ----
+  function renderWatch(){
+    var tb = document.querySelector('#watchTable tbody');
+    tb.innerHTML = '';
+    D.watch.forEach(function(w,i){
+      var shares = (w.price>0) ? Math.floor(budget/w.price) : 0;
+      var tr = document.createElement('tr');
+      tr.className = 'clickable';
+      tr.innerHTML =
+        '<td>'+w.code+'</td><td>'+w.name+'</td>'+
+        '<td>'+num(w.price)+'</td>'+
+        '<td class="'+cls(w.chgPct)+'">'+(w.chgPct===null?'—':sign(w.chgPct)+Math.abs(w.chgPct).toFixed(2)+'%')+'</td>'+
+        '<td>'+badge(w.signal)+'</td>'+
+        '<td>'+num(w.ma20)+'</td><td>'+num(w.ma60)+'</td>'+
+        '<td>'+num(w.pe,1)+'</td><td>'+num(w.yield,2)+'</td>'+
+        '<td class="'+cls(w.instNetVal)+'">'+num(w.instNetVal)+'</td>'+
+        '<td class="'+cls(w.revYoY)+'">'+num(w.revYoY,1)+'</td>'+
+        '<td class="afford">'+(shares>0?shares+' 股':'買不起')+'</td>';
+      tr.addEventListener('click', function(){ toggleDetail(tr, w); });
+      tb.appendChild(tr);
+    });
+  }
+  function toggleDetail(tr, w){
+    var next = tr.nextElementSibling;
+    if(next && next.classList.contains('detail')){ next.remove(); return; }
+    document.querySelectorAll('#watchTable tr.detail').forEach(function(x){x.remove();});
+    var d = document.createElement('tr');
+    d.className = 'detail';
+    var streaks = '';
+    if(w.fStreak>0) streaks += '外資連買 '+w.fStreak+' 天　';
+    if(w.tStreak>0) streaks += '投信連買 '+w.tStreak+' 天';
+    if(!streaks) streaks = '（法人連買天數資料累積中）';
+    d.innerHTML = '<td colspan="12">💡 <strong>'+w.name+'</strong>　'+w.advice+
+      '<br><span class="sub">'+streaks+'　｜近60日走勢：</span> <svg class="spark" width="200" height="36"></svg></td>';
+    tr.after(d);
+    var svg = d.querySelector('svg');
+    drawSpark(svg, w.histClose||[]);
+  }
+  renderWatch();
+  renderPicks();
+
+  // ---- 篩選榜單 ----
+  var curTab = 'inst';
+  var screenDefs = {
+    inst: {
+      note: '三大法人（外資＋投信＋自營商）當日買超金額最大的股票（'+(D.t86Date||'—')+'）。法人大買常代表籌碼面轉強。',
+      head: ['代號','名稱','收盤價','買超金額(億)','本益比','殖利率%','可買股數'],
+      rows: function(){ return (D.screenInst||[]).map(function(r){
+        return [r.code, r.name, num(r.price), '<span class="'+cls(r.instNetVal)+'">'+num(r.instNetVal)+'</span>', num(r.pe,1), num(r.yield,2), affordCell(r.price)];
+      });}
+    },
+    yield: {
+      note: '殖利率 ≥ 4%、本益比 25 倍以下、股價 200 元內、有成交量——適合零股存股研究的名單。',
+      head: ['代號','名稱','收盤價','殖利率%','本益比','股價淨值比','營收年增%','可買股數'],
+      rows: function(){ return (D.screenYield||[]).map(function(r){
+        return [r.code, r.name, num(r.price), '<strong>'+num(r.yield,2)+'</strong>', num(r.pe,1), num(r.pb,2), '<span class="'+cls(r.revYoY)+'">'+num(r.revYoY,1)+'</span>', affordCell(r.price)];
+      });}
+    },
+    rev: {
+      note: '最新月營收比去年同月成長 ≥ 30% 的公司。營收爆發常是股價的先行指標，但也要注意是否已大漲一段。',
+      head: ['代號','名稱','產業','收盤價','營收年增%','本益比','殖利率%','可買股數'],
+      rows: function(){ return (D.screenRev||[]).map(function(r){
+        return [r.code, r.name, r.industry||'—', num(r.price), '<span class="up">+'+num(r.revYoY,1)+'</span>', num(r.pe,1), num(r.yield,2), affordCell(r.price)];
+      });}
+    }
+  };
+  function affordCell(price){
+    var s = (price>0)?Math.floor(budget/price):0;
+    return s>0 ? '<span class="afford">'+s+' 股</span>' : '<span class="sub">買不起</span>';
+  }
+  function renderScreen(tab){
+    curTab = tab;
+    var def = screenDefs[tab];
+    document.getElementById('screenNote').textContent = def.note;
+    var t = document.getElementById('screenTable');
+    t.querySelector('thead').innerHTML = '<tr>'+def.head.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>';
+    var rows = def.rows();
+    t.querySelector('tbody').innerHTML = rows.length
+      ? rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';}).join('')
+      : '<tr><td colspan="9" class="sub">今日無資料</td></tr>';
+  }
+  document.querySelectorAll('.tabs button').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('.tabs button').forEach(function(x){x.classList.remove('active');});
+      b.classList.add('active');
+      renderScreen(b.dataset.tab);
+    });
+  });
+  renderScreen('inst');
+
+  // ---- AI 分析 ----
+  var box = document.getElementById('analysisBox');
+  var items = window.AI_ANALYSIS || [];
+  if(!items.length){
+    box.innerHTML = '<p class="sub">尚無分析。開啟 Claude Code 對話說「幫我更新本週分析」，我會搜尋近期新聞與數據，把趨勢分析放到這裡。</p>';
+  } else {
+    box.innerHTML = items.map(function(a){
+      return '<div class="analysis-item"><div class="date">'+a.date+'</div><h3>'+a.title+'</h3><div class="content">'+a.html+'</div></div>';
+    }).join('');
+  }
+})();
+</script>
+</body>
+</html>
