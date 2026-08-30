@@ -4,7 +4,7 @@
 
 【怎麼看網站】
   電腦：雙擊 index.html 就會用瀏覽器打開。
-  手機／平板：開 https://phil1206.github.io/invest/
+  手機／平板：開 https://phil1206.github.io/abcde/
   （每天電腦更新完會自動上傳，手機看到的就是電腦最後一次更新的資料）
 
 【資料怎麼更新】
